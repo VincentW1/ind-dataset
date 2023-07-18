@@ -1,0 +1,8 @@
+pandas>=0.23.3
+loguru>=0.2.5
+numpy~=1.25.1
+matplotlib~=3.7.2
+scikit-image~=0.21.0
+scipy~=1.11.1
+shapely
+descartes
