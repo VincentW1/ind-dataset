@@ -18,15 +18,16 @@ from shapely.wkt import loads
 from poly import Poly
 from vru import VRU
 from shapely.ops import unary_union
+from shapely.affinity import scale, rotate, translate
 
 class Vehicle():
 	wedge_nr_pnts = 8
 	wedge_max_angle = 60
-	wedge_min_len = 20
 	shadow_nr_pnts = 100
 	radar_len = 55
 	
 	def __init__(self, x, y, heading, vel_x, vel_y, acc_x, acc_y, track_frame, length=4, width=2, trackId=0, scaling_factor=1):
+		self.wedge_min_len = 20
 		self.trackId = trackId
 		self.pos = [x, y]
 		self.x = x
@@ -87,6 +88,7 @@ class Vehicle():
 		self.last_track_frame = track_frame
 		self.safetyCriticalAreaRadius = self.calculate_critical_radius()
 		self.update_shadow()
+		self.update_wedge()
 
 	def calculate_velocity(self, vel_x, vel_y):
 		current_velocity = np.sqrt(vel_x ** 2 + vel_y ** 2) * 3.6
@@ -235,37 +237,55 @@ class Vehicle():
 				return False
 
 	def calculate_critical_radius(self):
-		t = 2.5
+		t = 2.2
 		safetyCriticalAreaRadius = (t * abs(self.velocity) + 0.5 * abs(self.acc * t ** 2)) #+ ((self.velocity/3.6 + self.acc)** 2 / 2 * 2)
 		#safetyCriticalAreaRadius = (self.velocity) + ((self.velocity) ** 2 / 4)
 		return safetyCriticalAreaRadius
 
 
 	def update_wedge(self):
+
+		self.safetyCriticalAreaRadius = self.calculate_critical_radius()
 		wedge_length = max(self.safetyCriticalAreaRadius, self.wedge_min_len)
-		points = []
-		x,y = self.x, self.y
-		points.append([x, y])
-		step_size 	= self.wedge_nr_pnts/self.wedge_max_angle
-		start 		= self.heading - self.wedge_max_angle/2
-		stop 		= self.heading + self.wedge_max_angle/2
-		for angle in np.arange(start, stop+step_size, step_size):
-			endy = y + wedge_length * math.sin(math.radians(angle))
-			endx = x + wedge_length * math.cos(math.radians(angle))
-			points.append([endx, endy])
-		# Create a polygon for the vehicle based on the corner coordinates
-		vehicle_corners = list(zip(self.corner_xs, self.corner_ys))
-		vehicle_poly = sg.Polygon(vehicle_corners)
 
-		# Adding a buffer to the vehicle polygon
-		buffer_size = 5  # Define your buffer size here
-		vehicle_poly = vehicle_poly.buffer(buffer_size)
+		# # Create a polygon for the vehicle based on the corner coordinates
+		# vehicle_corners = list(zip(self.corner_xs, self.corner_ys))
+		# vehicle_poly = sg.Polygon(vehicle_corners)
+		#
+		# # Adding a buffer to the vehicle polygon
+		# buffer_size = 2  # Define your buffer size here
+		# vehicle_poly = vehicle_poly.buffer(buffer_size)
+		#
+		# # Create an ellipse around the vehicle by scaling the vehicle polygon
+		# vehicle_ellipse = scale(vehicle_poly, xfact=self.length,
+		# 						yfact=self.width, origin='center')
+		#
+		# # Create an ellipse for the area reachable going straight ahead
+		# # Note that a buffer of 0.5 is used to create a base ellipse with a minor axis length of 1
+		# wedge_ellipse = scale(sg.Point(0, 0).buffer(0.5), yfact=10, xfact=wedge_length, origin='center')
+		#
+		# # Rotate the wedge ellipse to align with the vehicle's heading
+		# wedge_ellipse = rotate(wedge_ellipse, self.heading, origin='center')
+		#
+		# # Calculate the position of the vehicle's back
+		# back_x = x - 0.5 * self.width * math.cos(math.radians(self.heading))
+		# back_y = y - 0.5 * self.width * math.sin(math.radians(self.heading))
+		#
+		# # Calculate the offset position for the wedge ellipse
+		# offset_x = x + (wedge_length / 2) * math.cos(math.radians(self.heading))
+		# offset_y = y + (wedge_length / 2) * math.sin(math.radians(self.heading))
+		#
+		# # Calculate the relative offset from the current position of the ellipse (centered at 0,0)
+		# xoff = offset_x - 0
+		# yoff = offset_y - 0
+		#
+		# # Translate the wedge ellipse to the offset position
+		# wedge_ellipse = translate(wedge_ellipse, xoff=xoff, yoff=yoff)
+		#
+		# # Rotate the vehicle ellipse to align with the vehicle's heading
+		# vehicle_ellipse = rotate(vehicle_ellipse, self.heading, origin='center')
 
-		self.wedge = points
-		self.wedge_poly = sg.Polygon(self.wedge)
-
-		# Combine the wedge polygon with the buffered vehicle polygon
-		self.combined_poly = unary_union([self.wedge_poly, vehicle_poly])
+		self.combined_poly = unary_union([vehicle_ellipse, wedge_ellipse])
 
 
 
@@ -309,6 +329,8 @@ class Vehicle():
 		shadow_poly = sg.Polygon(self.shadow_circle)
 		patch_shadow = PolygonPatch(shadow_poly, facecolor="green", edgecolor="green", alpha=0.1)
 		self.ax1.add_patch(patch_shadow)
+		patch_wedge = PolygonPatch(self.combined_poly, facecolor="blue", edgecolor="blue", alpha=0.5)
+		self.ax1.add_patch(patch_wedge)
 		for veh in self.other_veh:
 			self.ax1.plot(veh.corner_xs, veh.corner_ys, color="grey")
 		for vru in self.other_vru:

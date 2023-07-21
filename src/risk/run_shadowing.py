@@ -258,7 +258,7 @@ if __name__ == '__main__':
                         veh.add_other_veh(other_veh)
                 veh.update_all_vrus()
                 veh.noisy_measurement()
-        ego_veh_list[0].visualize(min_x, max_x, min_y, max_y)
+        ego_veh_list[1].visualize(min_x, max_x, min_y, max_y)
 
     for veh in ego_veh_list:
         veh.write_log()
